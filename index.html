@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>IPFS Zcash Explorer</title>
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <style>
+      .modal {
+          display:    none;
+          position:   fixed;
+          z-index:    1000;
+          top:        0;
+          left:       0;
+          height:     100%;
+          width:      100%;
+          background: rgba( 255, 255, 255, .8 )
+                      url('img/loading.gif')
+                      50% 50%
+                      no-repeat;
+      }
+
+      body.loading {
+          overflow: hidden;
+      }
+
+      body.loading .modal {
+          display: block;
+      }
+    </style>
+  </head>
+  <body>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="js/underscore-min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+
+    <div class="container-fluid">
+      <div>
+        <h1>IPFS ZCash Explorer</h1>
+        <form onsubmit="lookup($('#search').val()); return false">
+          <p class="lead"><input id="search" type="text" style="width: 650px" placeholder="Hash" value="z4QJh988wttY4rTJgLpmx57E3gEbun1vXmMVpBAwbA4pzE8MkLw"> <input type="submit" value="Lookup"></p>
+        </form>
+        <div id="error"></div>
+      </div>
+
+      <div id="display"></div>
+    </div>
+
+    <script type="text/template" id="block-template">
+      <table class="table table-striped">
+        <tbody>
+          <tr>
+            <td>Version</td>
+            <td><%= version %></td>
+          </tr>
+          <tr>
+            <td>Parent</td>
+            <td><a href="#" onclick="displayBlock('<%= parent['/'] %>')"><%= parent['/'] %></a></td>
+          </tr>
+          <tr>
+            <td>TX</td>
+            <td><a href="#" onclick="displayTx('<%= tx['/'] %>')"><%= tx['/'] %></a></td>
+          </tr>
+          <tr>
+            <td>Time</td>
+            <td><%= new Date(timestamp * 1000).toUTCString() %></td>
+          </tr>
+          <tr>
+            <td>Difficulty</td>
+            <td><%= difficulty %></td>
+          </tr>
+          <tr>
+            <td>Nonce</td>
+            <td><%= nonce %></td>
+          </tr>
+          <tr>
+            <td>Solution</td>
+            <td><%= solution.substring(0, 70) %>...</td>
+          </tr>
+        </tbody>
+      </table>
+    </script>
+
+    <script type="text/template" id="tx-template">
+      <div class="row">
+        <div class="col-md-6">
+          <h2>Transaction</h2>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6">
+          <table class="table table-striped">
+            <tbody>
+              <tr>
+                <td>TX</td>
+                <td><%= txid %></td>
+              <tr>
+                <td>Version</td>
+                <td><%= version %></td>
+              </tr>
+              <tr>
+                <td>Locktime</td>
+                <td><%= lockTime %></td>
+            </tbody>
+          </table>
+
+          <% if (inputs !== null) { %>
+            <h4>Inputs</h4>
+            <% inputs.forEach(function(input) { %>
+              <table class="table table-striped">
+                <tbody>
+                  <% if(input.prevTx && input.prevTx['/'] != 'z4QkEfz7QWt9Dw3uktxAyPpQ4NB2eqgJTepD9dVA2t4bkypNUdM') { %>
+                  <tr>
+                    <td>Previous Transaction</td>
+                    <td><a href="#" onclick="displayTx('<%= input.prevTx['/'] %>')"><%= input.prevTx['/'] %></a></td>
+                  </tr>
+
+                  <tr>
+                    <td>Previous Transaction Index</td>
+                    <td><%= input.prevTxIndex %></td>
+                  </tr>
+                  <% } %>
+                  <tr>
+                    <td>Script</td>
+                    <td><%= input.script.substring(0,50) %>...</td>
+                  </tr>
+                  <tr>
+                    <td>Sequence Number</td>
+                    <td><%= input.seqNo %></td>
+                  </tr>
+                  <tr>
+                    <td>jsPubKey</td>
+                    <td>
+                      <% if (typeof jsPubKey !== 'undefined') { %>
+                        <%= jsPubKey %>
+                      <% } %>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>jsSig</td>
+                    <td>
+                      <% if (typeof jsSig !== 'undefined') { %>
+                        <%= jsSig.substring(0,50) %>...
+                      <% } %>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            <% }) %>
+          <% } %>
+
+          <% if(typeof outputs !== 'undefined' && outputs != null) { %>
+            <h4>Outputs</h4>
+            <% outputs.forEach(function(output) { %>
+              <table class="table table-striped">
+                <tbody>
+                  <tr>
+                    <td>Value</td>
+                    <td><%= output.value %></td>
+                  </tr>
+                  <tr>
+                    <td>Script</td>
+                    <td><%= output.script %></td>
+                  </tr>
+                </tbody>
+              </table>
+            <% }) %>
+          <% } %>
+        </div>
+        <div class="col-md-6">
+          <% if (typeof joinSplits !== 'undefined') { %>
+            <h4>Join Splits</h4>
+            <% joinSplits.forEach(function(js) { %>
+              <table class="table table-striped">
+                <tbody>
+                  <tr>
+                    <td>OldVal</td>
+                    <td><%= js.OldVal %></td>
+                  </tr>
+                  <tr>
+                    <td>NewVal</td>
+                    <td><%= js.NewVal %></td>
+                  </tr>
+                  <tr>
+                    <td>Anchor</td>
+                    <td><%= js.Anchor %></td>
+                  </tr>
+                  <tr>
+                    <td>Nullifiers</td>
+                    <td>
+                      <% js.Nullifiers.forEach(function(nullifier) { %>
+                        <%= nullifier %><br>
+                      <% }) %>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Commitments</td>
+                    <td>
+                      <% js.Commitments.forEach(function(c) { %>
+                        <%= c %><br>
+                      <% }) %>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Ephemeral Key</td>
+                    <td><%= js.EphemeralKey %></td>
+                  </tr>
+                  <tr>
+                    <td>Ciphertexts</td>
+                    <td>
+                      <% js.CipherTexts.forEach(function(ct) { %>
+                        <%= ct.substring(0,50) %>...<br>
+                      <% }) %>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Random Seed</td>
+                    <td><%= js.RandomSeed %></td>
+                  </tr>
+                  <tr>
+                    <td>Macs</td>
+                    <td>
+                      <% js.Macs.forEach(function(macs) { %>
+                        <%= macs %><br>
+                      <% }) %>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Proof</td>
+                    <td><%= js.Proof.substring(0,50) %>...</td>
+                  </tr>
+                </tbody>
+              </table>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </script>
+
+    <script type="text/template" id="target-template">
+      <div class="row">
+        <div class="col-md-6">
+          <table class="table table-striped">
+            <tbody>
+              <tr>
+                <td>Left</td>
+                <td><a href="#" onclick="displayTx('<%= targets[0]['Target']['/'] %>')"><%= targets[0]['Target']['/'] %></a></td>
+              </tr>
+              <tr>
+                <td>Right</td>
+                <td><a href="#" onclick="displayTx('<%= targets[1]['Target']['/'] %>')"><%= targets[1]['Target']['/'] %></a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </script>
+
+    <script>
+      var templates = {
+        block: _.template($('#block-template').html()),
+        tx: _.template($('#tx-template').html()),
+        target: _.template($('#target-template').html())
+      }
+
+      function render(templateName, data) {
+        $('#display').html(templates[templateName](data))
+      }
+
+      function displayBlock(hash) {
+        getHash(hash, function(block) {
+          var date = new Date(block.timestamp * 1000)
+          block.formattedTime = date.toUTCString()
+          //block.solutionShorter = block.solution
+          render('block', block)
+        })
+      }
+
+      function displayTx(hash) {
+        getHash(hash, function(tx) {
+          if(Array.isArray(tx)) {
+            render('target', {targets: tx})
+          } else {
+            tx.txid = hash
+            render('tx', tx)
+          }
+        })
+      }
+
+      function detectHash(hash, data) {
+        if(data.inputs || data.outputs || data.joinSplits)
+          displayTx(hash)
+        else if(data.difficulty)
+          displayBlock(hash)
+        else if(Array.isArray(data))
+          displayTx(hash)
+      }
+
+      function lookup(hash) {
+        getHash(hash, function(data) {
+          detectHash(hash, data)
+        })
+      }
+
+      function getHash(hash, call) {
+        //$('#error').style('display', 'none')
+        //$('#error').html('')
+        $.getJSON('http://127.0.0.1:8080/api/v0/dag/get/'+hash, function(block) {
+          call(block)
+        }).fail(function() {
+          //$('#error').style('display', 'block')
+          //$('#error').html('Cannot find transaction, please try another.')
+        })
+      }
+
+      $body = $("body");
+
+      $(document).on({
+          ajaxStart: function() { $body.addClass("loading");    },
+           ajaxStop: function() { $body.removeClass("loading"); }
+      });
+
+      displayBlock('z4QJh988wttY4rTJgLpmx57E3gEbun1vXmMVpBAwbA4pzE8MkLw')
+      //displayTx('z4QkEfzAhErxphey8rm8aCnqfz92r94E8Bd6Ek3C3MqnJwbCSME')
+      //displayTx('z4QkEfzJydyuYi8ExfbtY6XgFH1CK6QoSwJeZ3sYFoVstM8n3xW') // Array of targets
+      //displayTx('z4QkEfz7T5Z6aBck3RGcQCyd3DCbgXyo5iYvWas9FY3h2Ca7UxA') // No Inputs
+    </script>
+    <div class="modal"></div>
+  </body>
+</html>
