@@ -254,11 +254,11 @@
             <tbody>
               <tr>
                 <td>Left</td>
-                <td><a href="#" onclick="displayTx('<%= targets[0]['Target']['/'] %>')"><%= targets[0]['Target']['/'] %></a></td>
+                <td><a href="#" onclick="displayTx('<%= targets[0]['/'] %>')"><%= targets[0]['/'] %></a></td>
               </tr>
               <tr>
                 <td>Right</td>
-                <td><a href="#" onclick="displayTx('<%= targets[1]['Target']['/'] %>')"><%= targets[1]['Target']['/'] %></a></td>
+                <td><a href="#" onclick="displayTx('<%= targets[1]['/'] %>')"><%= targets[1]['/'] %></a></td>
               </tr>
             </tbody>
           </table>
@@ -315,7 +315,7 @@
       function getHash(hash, call) {
         //$('#error').style('display', 'none')
         //$('#error').html('')
-        $.getJSON('http://127.0.0.1:8080/api/v0/dag/get/'+hash, function(block) {
+        $.getJSON('/api/v0/dag/get/'+hash, function(block) {
           call(block)
         }).fail(function() {
           //$('#error').style('display', 'block')
